@@ -56,28 +56,84 @@
     <h1>Ultra HDR Data Viewer</h1>
     <input type="file" id="fileInput" accept=".jpg,.jpeg">
     <div class="image-container">
-        <div>
+		<div>
             <h2>HDR</h2>
+            <img id="hdrImage" alt="HDR Image">
+        </div>	
+		<div>
+            <h2>SDR</h2>
             <img id="firstImage" alt="First Image">
         </div>
         <div>
             <h2>Gainmap</h2>
             <img id="secondImage" alt="Second Image">
         </div>
+
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/exifreader@4.23.3/dist/exif-reader.min.js"></script>
     <script>
         document.getElementById('fileInput').addEventListener('change', function (e) {
             const file = e.target.files[0];
-            processImage(file);
+            processImage(file, e);
         });
 
-        function processImage(file) {
+		function processOneImage(e1, imageOffset, imageLength, imageTag) {
+			const file = e1.target.files[0];
+            const reader = new FileReader();
+			console.log(file, imageTag, ' imageOffset:', imageOffset, 'imageLength', imageLength);
+			
+            reader.onload = function (e, offset=imageOffset, length=imageLength) {
+				const buffer = e.target.result;
+				// if(offset == -1) {
+				//     offset = buffer.byteLength - length;
+				// }
+				const imageBuffer = e.target.result.slice(offset, offset+length);
+				const imageBlob = new Blob([imageBuffer], { type: 'image/jpeg' });
+
+				displayImage(imageBlob, imageTag); //imageTag='secondImage'
+
+				// 2nd Exif
+				ExifReader.load(imageBuffer, { async: true, expanded: true }).then((tags) => {
+					// APP1 XMP
+					const xmpData = tags['xmp'];
+								/* Sample
+									<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Adobe XMP Core 5.5.0\">
+										<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">
+											<rdf:Description rdf:about=\"\"
+												xmlns:hdrgm=\"http://ns.adobe.com/hdr-gain-map/1.0/\" 
+												hdrgm:Version=\"1.0\" 
+												hdrgm:GainMapMin=\"0.000000\" 
+												hdrgm:GainMapMax=\"2.500000\" 
+												hdrgm:Gamma=\"1.000000\" 
+												hdrgm:OffsetSDR=\"0.000000\" 
+												hdrgm:OffsetHDR=\"0.000000\" 
+												hdrgm:HDRCapacityMin=\"0.000000\" 
+												hdrgm:HDRCapacityMax=\"2.300000\" 
+												hdrgm:BaseRenditionIsHDR=\"False\"/>
+										</rdf:RDF>
+									</x:xmpmeta>
+								*/
+					if (xmpData) {
+						console.log(' XMP:', xmpData);
+					}
+					
+					console.log(' tags:', tags);
+
+					// console.log(imageTag,' size:', tags['Image Width'], 'x', tags['Image Height']);
+				}).catch((error) => {
+					console.error('Exif error ():', error);
+				});
+
+            }
+            reader.readAsArrayBuffer(file);		
+		}
+
+        function processImage(file, e) {
             ExifReader.load(file, { async: true, expanded: true }).then((tags) => {
 
                 // process first image
-                displayImage(file, 'firstImage');
+                //displayImage(file, 'hdrImage');
                 const xmpData = tags['xmp'];
                 var possiblySecondMapLength = 0;
                 /* Sample:
@@ -104,7 +160,7 @@
                 */
                 if (xmpData) {
                     console.log('1st XMP:', xmpData);
-                    possiblySecondMapLength = Number(xmpData.Directory.value[1].Item.value.Length.value);
+                    //possiblySecondMapLength = Number(xmpData.Directory.value[1].Item.value.Length.value);
                     // console.log('1st size:', tags['Image Width'], 'x', tags['Image Height']);
 
                 }
@@ -115,58 +171,25 @@
                 var secondImageLength = 0;
                 const mpfData = tags['mpf'];
                 if (mpfData) {
-                    // console.log('1st MPF:'. mpfData); mpfData.Images[0].ImageOffset
+					console.log('mpfData:', mpfData); 
+                    console.log('mpfData.Images[0]:', mpfData.Images[0]); 
+                    console.log('mpfData.Images[1]:', mpfData.Images[1]); 
                     secondImageOffset = mpfData.Images[1].ImageOffset.value;
                     secondImageLength = mpfData.Images[1].ImageSize.value;
                     if (secondImageLength !=0 & secondImageOffset!=0)
                         has_second_image = true
+						console.log('secondImageOffset:', secondImageOffset, 'secondImageLength', secondImageLength);
                 }
-
+				// process second image
+                if (has_second_image) {
+					processOneImage(e, 0, secondImageOffset+secondImageLength, 'hdrImage');
+                	processOneImage(e, 0, secondImageOffset, 'firstImage');
+                } else {
+					displayImage(file, 'hdrImage');
+				}				
                 // process second image
                 if (has_second_image) {
-                    const reader = new FileReader();
-                    reader.onload = function (e, offset=secondImageOffset, length=secondImageLength) {
-                        const buffer = e.target.result;
-                        // if(offset == -1) {
-                        //     offset = buffer.byteLength - length;
-                        // }
-                        const secondImageBuffer = e.target.result.slice(offset);
-                        const secondImageBlob = new Blob([secondImageBuffer], { type: 'image/jpeg' });
-
-                        displayImage(secondImageBlob, 'secondImage');
-
-                        // 2nd Exif
-                        ExifReader.load(secondImageBuffer, { async: true, expanded: true }).then((tags) => {
-                            // APP1 XMP
-                            const xmpData = tags['xmp'];
-                            /* Sample
-                                <x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Adobe XMP Core 5.5.0\">
-                                    <rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">
-                                        <rdf:Description rdf:about=\"\"
-                                            xmlns:hdrgm=\"http://ns.adobe.com/hdr-gain-map/1.0/\" 
-                                            hdrgm:Version=\"1.0\" 
-                                            hdrgm:GainMapMin=\"0.000000\" 
-                                            hdrgm:GainMapMax=\"2.500000\" 
-                                            hdrgm:Gamma=\"1.000000\" 
-                                            hdrgm:OffsetSDR=\"0.000000\" 
-                                            hdrgm:OffsetHDR=\"0.000000\" 
-                                            hdrgm:HDRCapacityMin=\"0.000000\" 
-                                            hdrgm:HDRCapacityMax=\"2.300000\" 
-                                            hdrgm:BaseRenditionIsHDR=\"False\"/>
-                                    </rdf:RDF>
-                                </x:xmpmeta>
-                            */
-                            if (xmpData) {
-                                console.log('2nd XMP:', xmpData);
-                            }
-
-                            // console.log('2nd size:', tags['Image Width'], 'x', tags['Image Height']);
-                        }).catch((error) => {
-                            console.error('Exif error (2nd):', error);
-                        });
-
-                    }
-                    reader.readAsArrayBuffer(file);
+					processOneImage(e, secondImageOffset, secondImageLength, 'secondImage');
                 }
 
 
