@@ -68,11 +68,16 @@
 			 <h2>Second Image:GainMap</h2>
             <img id="secondImage" alt="Second Image">
         </div>
-
-
+		<!--
+		 <div>
+			<h2>Merge Image</h2>
+			<img id="qrPoster" alt="合成图">
+		</div>
+		-->
     </div>
       <div>
 	    <div>
+			<h2 id="imageFileSize" />
 			<h2 id="imageResolution" />
 			<h2 id="imageShootTime" />
 			<h2 id="imageColorComponents" />
@@ -82,7 +87,7 @@
 			</h3>
 			
 			<h3>
-			<div id="firstImageMpf" >xxxx</div>
+			<div id="firstImageMpf" ></div>
 			</h3>
 			
 			<h3><div id="secondImageXmp" />
@@ -96,11 +101,16 @@
 	-->
 	<script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
     <script>
+		var hdrImage, firstImage, secondImage; 
+		var imageResolution;
         document.getElementById('fileInput').addEventListener('change', function (e) {
             const file =	 e.target.files[0];
 			size = (file.size / 1024).toFixed(2) + 'kB';
 					
-			console.log(file, "size", size);					
+			console.log(file, "size", size);		
+
+			var y=document.getElementById("imageFileSize");
+			y.innerHTML="FileSize:"+size.toString();			
 			
 			getResolution(file)
             
@@ -112,11 +122,52 @@
 			
         });
 		
+		//这种方法无法实现HDR与SDR的合并画图
+		function drawPosterImage() {
+			console.log("drawPosterImage");
+			const canvas = document.createElement('canvas');
+			const hdrImage =document.getElementById("hdrImage");
+			const firstImage =document.getElementById("firstImage");
+			const secondImage =document.getElementById("secondImage");
+
+			if (isEmpty(hdrImage)) {
+				console.log("hdrImage is empty");
+				return;
+			}
+			if (isEmpty(secondImage)) {
+				console.log("secondImage(gainmap) is empty");
+				return;
+			}
+			// 海报模板的宽高
+			const posterW = canvas.width = hdrImage.width;
+			const posterH = canvas.height = hdrImage.height;
+			
+			console.log("posterW",posterW,"posterH",posterH);
+		
+			// 获取了一个 2D 渲染上下文，用于在 canvas 元素上进行绘图操作。
+			const context = canvas.getContext('2d');
+			// 使用 rect() 方法绘制一个矩形
+			context.rect(0, 0, canvas.width, canvas.height);
+			// 设置了矩形的填充颜色为白色
+			context.fillStyle = '#fff';
+			// 使用fill()方法填充矩形，将矩形以指定的颜色进行填充
+			context.fill();	
+			//draw left half hdr
+			context.drawImage(hdrImage, 0, 0, posterW, posterH);
+			//draw right half sdr
+			context.drawImage(firstImage, sx=imageResolution.width/2, sy=0, sWidth=imageResolution.width/2, sHeight=imageResolution.height, dx=posterW/2, dy=0,  dWidth=posterW/2, dHeight=posterH);
+		
+
+			// 获取canvas base64的图片流
+			const base64 = canvas.toDataURL('image/png');
+			document.getElementById('qrPoster').setAttribute('src', base64);
+		}
 		async  function getResolution(file) {
 			const fileBase64 = await  getBase64(file);
 			//console.log("fileBase64", fileBase64);					
 			const res = await  getImgPx(fileBase64);
-			console.log("resolution", res.width,"x", res.height);	
+			console.log("resolution", res.width,"x", res.height);
+			imageResolution = res;
 				
 			var y=document.getElementById("imageResolution");
 			y.innerHTML="Resolution:"+res.width.toString()+"x"+res.height.toString();
@@ -151,13 +202,17 @@
 			var y=document.getElementById("imageShootTime");
 			if (y) {
 				y.innerHTML="ShootTime:"+shootTime;
-				}
+			}
 			if (tagj && tagw) {
 				const lng = tagj[0] + tagj[1] / 60 + tagj[2] / 60 / 60
 				const lat = tagw[0] + tagw[1] / 60 + tagw[2] / 60 / 60
 				resolve({ lng: lng, lat: lat, shootTime: shootTime })
-			  }
+			  
+			} else if (!isEmpty(shootTime)){
+			  resolve({lng: nil, lat: nil, shootTime: shootTime})
+			} else {
 			  resolve({})
+			}
 			})
 		  })
 		}
@@ -338,16 +393,16 @@
                 }
 				// process second image
                 if (has_second_image) {
-					processOneImage(e, 0, secondImageOffset+secondImageLength, 'hdrImage');
-                	processOneImage(e, 0, secondImageOffset, 'firstImage');
+					hdrImage = processOneImage(e, 0, secondImageOffset+secondImageLength, 'hdrImage');
+                	firstImage = processOneImage(e, 0, secondImageOffset, 'firstImage');
                 } else {
 					displayImage(file, 'hdrImage');
 				}				
                 // process second image
                 if (has_second_image) {
-					processOneImage(e, secondImageOffset, secondImageLength, 'secondImage');
+					secondImage = processOneImage(e, secondImageOffset, secondImageLength, 'secondImage');
                 }
-
+				//setTimeout(function() { drawPosterImage(); }, 2000);
 
             }).catch((error) => {
                 console.error('Exif error (1st):', error);
