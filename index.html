@@ -76,12 +76,19 @@
 			<h2 id="imageResolution" />
 			<h2 id="imageShootTime" />
 			<h2 id="imageColorComponents" />
+			
 			<h3><div id="firstImageXmp" />
 			<div id="firstImageFile" />
 			</h3>
+			
+			<h3>
+			<div id="firstImageMpf" >xxxx</div>
+			</h3>
+			
 			<h3><div id="secondImageXmp" />
 			<div id="secondImageFile" />
 			</h3>
+			
 	       <h4>Comments: Google Chrome, Microsoft Edge support HDR. FireFox not support. Modify by Zorro@2024</h4>
         </div>
     <script src="https://cdn.jsdelivr.net/npm/exifreader@4.23.3/dist/exif-reader.min.js"></script>
@@ -298,9 +305,7 @@
 					console.log('1st file:', fileTag);
 					var y=document.getElementById("firstImageFile");
 					var fileDataStr = JSON.stringify(fileTag).replace(/\\n/g, '</br>');
-					if (isEmpty(fileTag)){
-						fileDataStr='';
-					} else {
+					if (!isEmpty(fileTag)){
 						fileDataStr=fileDataStr.replace(/},/g, '},</br>');
 					}
 					if (y) {
@@ -320,7 +325,16 @@
                     secondImageLength = mpfData.Images[1].ImageSize.value;
                     if (secondImageLength !=0 & secondImageOffset!=0)
                         has_second_image = true
-						console.log('secondImageOffset:', secondImageOffset, 'secondImageLength', secondImageLength);
+					console.log('secondImageOffset:', secondImageOffset, 'secondImageLength', secondImageLength);
+					
+					var y=document.getElementById("firstImageMpf");
+					var fileMpfStr = JSON.stringify(mpfData).replace(/\\n/g, '</br>');
+					if (!isEmpty(fileMpfStr)){
+						fileMpfStr=fileMpfStr.replace(/},/g, '},</br>');
+					}
+					if (y) {
+						y.innerHTML="firstImageMpf:"+fileMpfStr;
+					}
                 }
 				// process second image
                 if (has_second_image) {
