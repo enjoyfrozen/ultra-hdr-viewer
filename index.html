@@ -61,11 +61,11 @@
             <img id="hdrImage" alt="HDR Image">
         </div>	
 		<div>
-            <h2>SDR</h2>
+            <h2>First Image:SDR</h2>
             <img id="firstImage" alt="First Image">
         </div>
 		 <div>
-			 <h2>GainMap</h2>
+			 <h2>Second Image:GainMap</h2>
             <img id="secondImage" alt="Second Image">
         </div>
 
@@ -74,11 +74,20 @@
       <div>
 	    <div>
 			<h2 id="imageResolution" />
-			<h3><text id="firstImageXmp" /></h3>
-			<h3><text id="secondImageXmp" /></h3>
+			<h2 id="imageShootTime" />
+			<h2 id="imageColorComponents" />
+			<h3><div id="firstImageXmp" />
+			<div id="firstImageFile" />
+			</h3>
+			<h3><div id="secondImageXmp" />
+			<div id="secondImageFile" />
+			</h3>
 	       <h4>Comments: Google Chrome, Microsoft Edge support HDR. FireFox not support. Modify by Zorro@2024</h4>
         </div>
     <script src="https://cdn.jsdelivr.net/npm/exifreader@4.23.3/dist/exif-reader.min.js"></script>
+	<!--<script src="https://cdn.bootcdn.net/ajax/libs/exif-js/2.3.0/exif.min.js"></script>
+	-->
+	<script src="https://cdn.jsdelivr.net/npm/exif-js"></script>
     <script>
         document.getElementById('fileInput').addEventListener('change', function (e) {
             const file =	 e.target.files[0];
@@ -87,7 +96,13 @@
 			console.log(file, "size", size);					
 			
 			getResolution(file)
-            processImage(file, e);
+            
+			const loc = getImgLocation(file);
+			console.log("location", loc.lng,",", loc.lat, "shootTime", loc.shootTime);	
+
+			
+			processImage(file, e);
+			
         });
 		
 		async  function getResolution(file) {
@@ -95,22 +110,51 @@
 			//console.log("fileBase64", fileBase64);					
 			const res = await  getImgPx(fileBase64);
 			console.log("resolution", res.width,"x", res.height);	
-			
+				
 			var y=document.getElementById("imageResolution");
 			y.innerHTML="Resolution:"+res.width.toString()+"x"+res.height.toString();
+			
 		}
 		function getImgPx(img) {
 			const image = new Image();
 			image.src = img;
-
+		
 			return new Promise((resolve) => {
-				image.onload = () => {
+				image.onload = () => {					
 					const width = image.width;
 					const height = image.height;
 					resolve({ width, height });
 				};
+		
 			});
 		}
+		
+		function getImgLocation(img) {
+		  return new Promise(resolve => {
+			EXIF.getData(img, function() {
+			  const exifData = EXIF.getAllTags(img)
+			  console.log("exifData", exifData);
+
+			  const shootTime = EXIF.getTag(this, 'DateTime')
+			  const tagj = EXIF.getTag(this, 'GPSLongitude')
+			  const tagw = EXIF.getTag(this, 'GPSLatitude')
+				console.log("shootTime", shootTime);
+
+
+			var y=document.getElementById("imageShootTime");
+			if (y) {
+				y.innerHTML="ShootTime:"+shootTime;
+				}
+			if (tagj && tagw) {
+				const lng = tagj[0] + tagj[1] / 60 + tagj[2] / 60 / 60
+				const lat = tagw[0] + tagw[1] / 60 + tagw[2] / 60 / 60
+				resolve({ lng: lng, lat: lat, shootTime: shootTime })
+			  }
+			  resolve({})
+			})
+		  })
+		}
+
 
 		function getBase64(file){
 			const reader = new FileReader();
@@ -121,7 +165,13 @@
 				};
 			});
 		}
-
+		function isEmpty(obj){
+			if(typeof obj == "undefined" || obj == null || obj == ""){
+				return true;
+			}else{
+				return false;
+			}
+		}
 
 		function processOneImage(e1, imageOffset, imageLength, imageTag) {
 			const file = e1.target.files[0];
@@ -142,6 +192,7 @@
 				ExifReader.load(imageBuffer, { async: true, expanded: true }).then((tags) => {
 					// APP1 XMP
 					const xmpData = tags['xmp'];
+					const fileTag = tags['file'];
 								/* Sample
 									<x:xmpmeta xmlns:x=\"adobe:ns:meta/\" x:xmptk=\"Adobe XMP Core 5.5.0\">
 										<rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">
@@ -160,17 +211,44 @@
 									</x:xmpmeta>
 								*/
 					if (xmpData) {
-						console.log(' XMP:', xmpData);
-						
-						var y=document.getElementById("secondImageXmp");
-						y.innerHTML="secondImageXmp:"+JSON.stringify(xmpData);
+						console.log(imageTag, ' XMP:', xmpData);
+						if (imageTag == 'secondImage'){
+							var y=document.getElementById("secondImageXmp");
+							var xmpDataStr = JSON.stringify(xmpData).replace(/\\n/g, '</br>');
+							xmpDataStr=xmpDataStr.replace(/},/g, '},</br>');
+							y.innerHTML="secondImageXmp:"+xmpDataStr;
+						}
 					}
-					
-					console.log(' tags:', tags);
+					if (fileTag) {
+						if (imageTag == 'secondImage'){
+							console.log('2nd file:', fileTag);
+							var y=document.getElementById("secondImageFile");
+							var fileDataStr = JSON.stringify(fileTag).replace(/\\n/g, '</br>');
+							fileDataStr=fileDataStr.replace(/},/g, '},</br>');
+							
+							if (y) {
+								y.innerHTML="secondImageFile:"+fileDataStr;
+							}
+							if (fileTag['Color Components']) {
+								var colorComponents = fileTag['Color Components'].value;
+								console.log('colorComponents:', colorComponents);
+								var y=document.getElementById("imageColorComponents");
+								if (colorComponents==1) {
+									y.innerHTML="GainMap:"+colorComponents +","+"GrayScale";
+								} else if (colorComponents==3) {
+									y.innerHTML="GainMap:"+colorComponents +","+"ColorScale";
+								} else {
+									y.innerHTML="GainMap:"+colorComponents +","+"Unknown";
+								}
+							}
+							
+						}
+					}
+					console.log(imageTag, ' tags:', tags);
 
 					// console.log(imageTag,' size:', tags['Image Width'], 'x', tags['Image Height']);
 				}).catch((error) => {
-					console.error('Exif error ():', error);
+					console.error(imageTag, 'Exif error ():', error);
 				});
 
             }
@@ -183,7 +261,8 @@
                 // process first image
                 //displayImage(file, 'hdrImage');
                 const xmpData = tags['xmp'];
-                var possiblySecondMapLength = 0;
+                const fileTag = tags['file'];
+				var possiblySecondMapLength = 0;
                 /* Sample:
                     <?xpacket begin="ï»¿" id="W5M0MpCehiHzreSzNTczkc9d"?>
                     <x:xmpmeta xmlns:x="adobe:ns:meta/" x:xmptk="XMP Core 5.5.0">
@@ -211,11 +290,23 @@
                     //possiblySecondMapLength = Number(xmpData.Directory.value[1].Item.value.Length.value);
                     // console.log('1st size:', tags['Image Width'], 'x', tags['Image Height']);
 					var y=document.getElementById("firstImageXmp");
-					let toString = obj => Object.entries(obj).map(([k, v]) => `${k}: ${v}`).join(', ');
-
-					y.innerHTML="firstImageXmp:"+JSON.stringify(xmpData);
+					var xmpDataStr = JSON.stringify(xmpData).replace(/\\n/g, '</br>');
+					xmpDataStr=xmpDataStr.replace(/},/g, '},</br>');
+					y.innerHTML="firstImageXmp:"+xmpDataStr;
                 }
-
+				if (fileTag) {
+					console.log('1st file:', fileTag);
+					var y=document.getElementById("firstImageFile");
+					var fileDataStr = JSON.stringify(fileTag).replace(/\\n/g, '</br>');
+					if (isEmpty(fileTag)){
+						fileDataStr='';
+					} else {
+						fileDataStr=fileDataStr.replace(/},/g, '},</br>');
+					}
+					if (y) {
+						y.innerHTML="firstImageFile:"+fileDataStr;
+					}
+				}
 
                 var has_second_image = false;
                 var secondImageOffset = 0;
